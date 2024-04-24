@@ -7,6 +7,7 @@ let urlSechma = new mongoose.Schema({
     },
     short_url: {
         type: Number,
+        default: 0,
         required: true,
         unique: true
     }
