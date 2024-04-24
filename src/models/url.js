@@ -13,6 +13,5 @@ let urlSechma = new mongoose.Schema({
     }
 });
 
-const ShortnedURl = new mongoose.model('shortendUrl', urlSechma);
-module.exports = ShortnedURl;
+module.exports = mongoose.model('ShortnedURl', urlSechma);
 
