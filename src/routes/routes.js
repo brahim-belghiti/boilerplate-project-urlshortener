@@ -5,39 +5,44 @@ const ShortnedURl = require('../models/url');
 const dns = require('dns');
 const Counter = require('../models/counter');
 
-// Endpoint for creating a shortened URL
 router.post('/shorturl', async (req, res) => {
-    // Extract the original URL from the request body
     const originalUrl = req.body.url;
+    const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/;
 
-    // Check if the original URL is provided
-    if (!originalUrl) {
-        return res.status(400).json({ error: 'Please provide a URL' });
+    // Validate URL
+    if (!originalUrl || !urlRegex.test(originalUrl)) {
+        return res.json({ error: 'Invalid URL' });
     }
 
-    // Increment the counter and get the updated count
-    const updatedCounter = await Counter.findOneAndUpdate({}, { $inc: { count: 1 } }, { new: true, upsert: true });
+    // Perform DNS lookup asynchronously
+    const { hostname } = new URL(originalUrl);
+    dns.lookup(hostname, async (err, address, family) => {
+        if (err) {
+            console.error(err);
+            // DNS lookup failed, return an error
+            return res.json({ error: 'DNS lookup failed' });
+        }
 
-    // Construct the short URL using the updated count
-    const shortUrl = updatedCounter.count;
+        // Increment counter and generate short URL
+        const updatedCounter = await Counter.findOneAndUpdate({}, { $inc: { count: 1 } }, { new: true, upsert: true });
+        const shortUrl = updatedCounter.count;
 
-    // Create a new ShortenedUrl document
-    const newShortenedUrl = new ShortenedUrl({
-        original_url: originalUrl,
-        short_url: shortUrl
+        // Save to database
+        const newShortenedUrl = new ShortnedURl({
+            original_url: originalUrl,
+            short_url: shortUrl
+        });
+
+        try {
+            await newShortenedUrl.save();
+            res.status(200).json({ original_url: originalUrl, short_url: shortUrl });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
     });
-
-    try {
-        // Save the new ShortenedUrl document
-        await newShortenedUrl.save();
-        // Respond with the original and shortened URLs
-        res.status(200).json({ original_url: originalUrl, short_url: shortUrl });
-    } catch (err) {
-        // Handle any errors
-        console.error(err);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
 });
+
 
 router.get('/shorturl/:shorturl', (req, res) => {
     const shortUrl = req.params.shorturl;
@@ -46,11 +51,8 @@ router.get('/shorturl/:shorturl', (req, res) => {
             if (!doc) {
                 return res.status(404).json({ message: "URL not found" });
             }
-            console.log("🚀 ~ .then ~ doc:", doc)
-
             const { original_url } = doc;
-            console.log("Redirecting to:", original_url);
-            res.redirect(302, `https://${original_url}`); // Redirect to the original URL
+            res.redirect(301, original_url); // Redirect to the original URL
         })
         .catch((err) => {
             console.error(err);
