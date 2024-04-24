@@ -5,5 +5,4 @@ const { createShortURLController, getShortURLController } = require('../controll
 router.post('/shorturl', createShortURLController);
 router.get('/shorturl/:shorturl', getShortURLController);
 
-
 module.exports = router;
